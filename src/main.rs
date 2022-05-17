@@ -1,18 +1,15 @@
-#[allow(unused_imports)]
-use std::env;
-#[allow(unused_imports)]
-use std::fs;
-#[allow(unused_imports)]
-use std::net::TcpListener;
+use tokio::net::TcpListener;
+use tokio::stream::StreamExt;
 
-fn main() {
-    // You can use print statements as follows for debugging, they'll be visible when running tests.
-    println!("Logs from your program will appear here!");
+#[tokio::main]
+async fn main() -> Result<(), &'static str> {
 
-    // Uncomment this block to pass the first stage
-    // let listener = TcpListener::bind("127.0.0.1:6379").unwrap();
-    // match listener.accept() {
-    //     Ok((_socket, addr)) => println!("accepted new client: {:?}", addr),
-    //     Err(e) => println!("couldn't accept client: {:?}", e),
-    // }
+    let mut listener = TcpListener::bind("[::]:6379").await.map_err(|_| "failed to bind on 6379")?;
+    while let Some(stream) = listener.incoming().filter_map(|x| x.ok()).next().await {
+        println!("user connected: {}", stream.peer_addr().map_err(|_| "cannot get peer address")?);
+        tokio::spawn(async {
+
+        });
+    }
+    Ok(())
 }
