@@ -117,7 +117,7 @@ impl RespDataType {
             let mut newline: [u8; 2] = [0; 2];
             source.read_exact(&mut newline).await?;
             if &newline != b"\r\n" {
-                Err(format!("expected <CR> <LF>, got {newline:?}").into())
+                Err(format!("expected <CR> <LF>, got {:?}", newline).into())
             } else {
                 Ok(())
             }
@@ -188,7 +188,7 @@ impl RespDataType {
                         None
                     }))
                 }
-                x => Err(format!("unknown message tag '{x}'").into()),
+                x => Err(format!("unknown message tag '{}'", x).into()),
             }
         })
     }
