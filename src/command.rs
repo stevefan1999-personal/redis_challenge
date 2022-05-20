@@ -4,10 +4,7 @@ use crate::{
     util::{self, BoxFuture, GenericError},
 };
 use std::{
-    collections::{
-        hash_map::Entry::{Occupied, Vacant},
-        HashMap,
-    },
+    collections::HashMap,
     convert::{TryFrom, TryInto},
     time::Duration,
 };
@@ -103,26 +100,22 @@ impl TryFrom<RespDataType> for RespCommand {
                                     .transpose()?
                                     .map(|s| s.to_ascii_lowercase())
                                     .ok_or::<GenericError>("expected PX".into())?;
-                                dbg!(&ttl_type);
 
                                 let expiry = expiry_value
                                     .cloned()
                                     .map(|x| match x {
-                                        RespDataType::BulkStrings(Some(s)) => String::from_utf8(s)?
-                                            .parse::<u64>()
-                                            .map_err::<GenericError, _>(|x| x.into()),
-                                        RespDataType::Integers(n) => {
-                                            n.try_into().map_err::<GenericError, _>(|_| {
-                                                "cannot parse number".into()
-                                            })
+                                        RespDataType::BulkStrings(Some(s)) => {
+                                            Ok(String::from_utf8(s)?.parse::<u64>()?)
                                         }
-                                        _ => Err("expected bulk string or int".into()),
+                                        RespDataType::Integers(n) => Ok(n.try_into()?),
+                                        _ => Err::<_, GenericError>(
+                                            "expected bulk string or int".into(),
+                                        ),
                                     })
                                     .transpose()?
                                     .ok_or("expected time")?
                                     .try_into()
                                     .map(Duration::from_millis)?;
-                                dbg!(&expiry);
 
                                 match ttl_type.as_str() {
                                     "px" => Ok(RespCommand::Set(Set {
@@ -186,29 +179,15 @@ impl<'a> Command<'a, HashMap<String, RedisDataTypeWithTTL>> for Set {
                 .clone()
                 .into_bulk_strings()?
                 .ok_or::<GenericError>("empty key".into())?;
-            let key = String::from_utf8(key).map_err::<GenericError, _>(|x| x.into())?;
             let value: RedisDataType = self.value.clone().try_into()?;
-            let entry = context.entry(key);
-
-            let ttl = match self.expiry {
-                Some(time) => RedisDataTypeWithTTL::Finite(value, Instant::now() + time),
-                None => RedisDataTypeWithTTL::Infinite(value),
-            };
-
-            match entry {
-                Occupied(mut o) => {
-                    // let old_value: RespDataType = o.get().clone().try_into()?;
-                    // *o.get_mut() = value;
-                    // Ok(old_value)
-
-                    *o.get_mut() = ttl;
-                    Ok(RespDataType::simple_strings("OK"))
-                }
-                Vacant(v) => {
-                    v.insert(ttl);
-                    Ok(RespDataType::simple_strings("OK"))
-                }
-            }
+            context.insert(
+                String::from_utf8(key)?,
+                match self.expiry {
+                    Some(time) => RedisDataTypeWithTTL::Finite(value, Instant::now() + time),
+                    None => RedisDataTypeWithTTL::Infinite(value),
+                },
+            );
+            Ok(RespDataType::simple_strings("OK"))
         })
     }
 }

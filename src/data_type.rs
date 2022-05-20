@@ -130,25 +130,20 @@ impl RespDataType {
             sink.write_u8(self.tag()).await?;
             match self {
                 Self::SimpleStrings(str) => {
-                    dbg!(str);
                     sink.write(str).await?;
                     sink.write(b"\r\n").await?;
                 }
                 Self::Errors(err) => {
-                    dbg!(err);
                     sink.write(err).await?;
                     sink.write(b"\r\n").await?;
                 }
                 Self::Integers(num) => {
-                    dbg!(num);
                     sink.write(num.to_string().as_bytes()).await?;
                     sink.write(b"\r\n").await?;
                 }
                 Self::BulkStrings(str) => {
-                    dbg!(str);
                     match str {
                         Some(str) => {
-                            dbg!(str);
                             sink.write(str.len().to_string().as_bytes()).await?;
                             sink.write(b"\r\n").await?;
                             sink.write(str).await?;
@@ -160,7 +155,6 @@ impl RespDataType {
                     sink.write(b"\r\n").await?;
                 }
                 Self::Arrays(Some(arr)) => {
-                    dbg!(arr);
                     sink.write(arr.len().to_string().as_bytes()).await?;
                     sink.write(b"\r\n").await?;
                     for elem in arr {
@@ -169,7 +163,6 @@ impl RespDataType {
                 }
 
                 Self::Arrays(None) => {
-                    dbg!("array none");
                     sink.write(b"-1").await?;
                     sink.write(b"\r\n").await?;
                 }
@@ -197,43 +190,32 @@ impl RespDataType {
         Box::pin(async move {
             match source.read_u8().await? {
                 b'+' => {
-                    dbg!("read simple strings");
                     let mut buf = String::new();
                     source.read_line(&mut buf).await?;
                     let buf = crate::util::strip_trailing_newline(&buf).to_owned();
-                    dbg!(&buf);
                     Ok(RespDataType::SimpleStrings(buf.into_bytes()))
                 }
                 b'-' => {
-                    dbg!("read errors");
                     let mut buf = String::new();
                     source.read_line(&mut buf).await?;
                     let buf = crate::util::strip_trailing_newline(&buf).to_owned();
-                    dbg!(&buf);
                     Ok(RespDataType::Errors(buf.into_bytes()))
                 }
                 b':' => {
-                    dbg!("read integers");
                     let mut buf = String::new();
                     source.read_line(&mut buf).await?;
                     let buf = crate::util::strip_trailing_newline(&buf).to_owned();
-                    dbg!(&buf);
                     let num = buf.parse()?;
-                    dbg!(num);
                     Ok(RespDataType::Integers(num))
                 }
                 b'$' => {
-                    dbg!("read bulk strings");
                     let mut buf = String::new();
                     source.read_line(&mut buf).await?;
                     let buf = crate::util::strip_trailing_newline(&buf).to_owned();
-                    dbg!(&buf);
                     let n = buf.parse::<i64>()?;
-                    dbg!(n);
                     Ok(RespDataType::BulkStrings(if n >= 0 {
                         let mut str = vec![0; n as usize];
                         source.read_exact(&mut str).await?;
-                        dbg!(&str);
                         expect_new_line(source).await?;
                         Some(str)
                     } else {
@@ -241,7 +223,6 @@ impl RespDataType {
                     }))
                 }
                 b'*' => {
-                    dbg!("read arrays");
                     let mut buf = String::new();
                     source.read_line(&mut buf).await?;
                     let buf = crate::util::strip_trailing_newline(&buf).to_owned();
@@ -250,10 +231,8 @@ impl RespDataType {
                         let mut vec = Vec::with_capacity(n as usize);
                         for _ in 0..n {
                             let deser = Self::deserialize(source).await?;
-                            dbg!(&deser);
                             vec.push(deser);
                         }
-                        dbg!(&vec);
                         Some(vec)
                     } else {
                         None

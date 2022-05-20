@@ -24,12 +24,12 @@ impl RedisServer {
     async fn process(&self, stream: TcpStream) -> crate::util::Result<()> {
         let mut stream = BufStream::new(stream);
         loop {
-            let ret = match RespDataType::deserialize(&mut stream)
+            match RespDataType::deserialize(&mut stream)
                 .await
                 .and_then(|data| data.try_into() as Result<RespCommand, _>)
             {
+                Err(e) => Err(e),
                 Ok(cmd) => {
-                    dbg!(&cmd);
                     match cmd {
                         RespCommand::Ping(ping) => ping.execute(&mut ()).await,
                         RespCommand::Echo(echo) => echo.execute(&mut ()).await,
@@ -45,12 +45,10 @@ impl RedisServer {
                         } // _ => RespDataType::errors("unimplemented"),
                     }
                 }
-                Err(e) => Err(e),
             }
-            .unwrap_or_else(|e| RespDataType::errors(e.to_string()));
-            dbg!(&ret);
-
-            ret.serialize(&mut stream).await?;
+            .unwrap_or_else(|e| RespDataType::errors(e.to_string()))
+            .serialize(&mut stream)
+            .await?;
             stream.flush().await?;
         }
     }
