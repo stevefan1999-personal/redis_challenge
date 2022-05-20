@@ -1,6 +1,6 @@
 use crate::{
     command::{Command, RespCommand},
-    data_type::{RedisDataType, RespDataType},
+    data_type::{RedisDataTypeWithTTL, RespDataType},
 };
 use std::{collections::HashMap, convert::TryInto, sync::Arc};
 use tokio::{
@@ -11,7 +11,7 @@ use tokio::{
 };
 
 pub struct RedisServer {
-    db: Arc<Mutex<HashMap<String, RedisDataType>>>,
+    db: Arc<Mutex<HashMap<String, RedisDataTypeWithTTL>>>,
 }
 
 impl RedisServer {

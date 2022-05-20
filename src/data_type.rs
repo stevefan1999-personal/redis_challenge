@@ -3,6 +3,7 @@
 use crate::{util, util::BoxFuture};
 use std::convert::{TryFrom, TryInto};
 use tokio::prelude::*;
+use tokio::time;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum RespDataType {
@@ -18,6 +19,12 @@ pub enum RedisDataType {
     Strings(Vec<u8>),
     Integers(i64),
     Array(Vec<RedisDataType>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum RedisDataTypeWithTTL {
+    Infinite(RedisDataType),
+    Finite(RedisDataType, time::Instant),
 }
 
 impl TryFrom<RedisDataType> for RespDataType {
@@ -99,6 +106,13 @@ impl RespDataType {
             _ => Err("expected bulk strings".into()),
         }
     }
+    pub fn into_integers(self) -> util::Result<i64> {
+        match self {
+            RespDataType::Integers(x) => Ok(x),
+            _ => Err("expected integers".into()),
+        }
+    }
+
     pub fn expect_bulk_strings(&self) -> util::Result<&RespDataType> {
         match self {
             RespDataType::BulkStrings(_) => Ok(self),
