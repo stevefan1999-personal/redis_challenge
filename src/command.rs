@@ -107,7 +107,17 @@ impl TryFrom<RespDataType> for RespCommand {
 
                                 let expiry = expiry_value
                                     .cloned()
-                                    .map(|x| x.into_integers())
+                                    .map(|x| match x {
+                                        RespDataType::BulkStrings(Some(s)) => String::from_utf8(s)?
+                                            .parse::<u64>()
+                                            .map_err::<GenericError, _>(|x| x.into()),
+                                        RespDataType::Integers(n) => {
+                                            n.try_into().map_err::<GenericError, _>(|_| {
+                                                "cannot parse number".into()
+                                            })
+                                        }
+                                        _ => Err("expected bulk string or int".into()),
+                                    })
                                     .transpose()?
                                     .ok_or("expected time")?
                                     .try_into()
