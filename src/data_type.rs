@@ -1,4 +1,7 @@
-use crate::util::BoxFuture;
+#![allow(dead_code)]
+
+use crate::{util, util::BoxFuture};
+use std::convert::{TryFrom, TryInto};
 use tokio::prelude::*;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -8,6 +11,45 @@ pub enum RespDataType {
     Integers(i64),
     BulkStrings(Option<Vec<u8>>),
     Arrays(Option<Vec<RespDataType>>),
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum RedisDataType {
+    Strings(Vec<u8>),
+    Integers(i64),
+    Array(Vec<RedisDataType>),
+}
+
+impl TryFrom<RedisDataType> for RespDataType {
+    type Error = util::GenericError;
+    fn try_from(value: RedisDataType) -> Result<Self, Self::Error> {
+        match value {
+            RedisDataType::Strings(x) => Ok(RespDataType::bulk_strings(x)),
+            RedisDataType::Integers(n) => Ok(RespDataType::Integers(n)),
+            RedisDataType::Array(a) => Ok(RespDataType::arrays(
+                a.into_iter()
+                    .map(|x| x.try_into())
+                    .collect::<Result<Vec<_>, _>>()?,
+            )),
+            // _ => Err("impossible".into()),
+        }
+    }
+}
+
+impl TryFrom<RespDataType> for RedisDataType {
+    type Error = util::GenericError;
+    fn try_from(data: RespDataType) -> Result<Self, Self::Error> {
+        match data {
+            RespDataType::BulkStrings(Some(x)) => Ok(RedisDataType::Strings(x)),
+            RespDataType::Integers(n) => Ok(RedisDataType::Integers(n)),
+            RespDataType::Arrays(Some(a)) => Ok(RedisDataType::Array(
+                a.into_iter()
+                    .map(|x| x.try_into())
+                    .collect::<Result<Vec<_>, _>>()?,
+            )),
+            _ => Err("impossible".into()),
+        }
+    }
 }
 
 impl RespDataType {
@@ -46,6 +88,21 @@ impl RespDataType {
             Self::Integers(_) => b':',
             Self::BulkStrings(_) => b'$',
             Self::Arrays(_) => b'*',
+        }
+    }
+}
+
+impl RespDataType {
+    pub fn into_bulk_strings(self) -> util::Result<Option<Vec<u8>>> {
+        match self {
+            RespDataType::BulkStrings(x) => Ok(x),
+            _ => Err("expected bulk strings".into()),
+        }
+    }
+    pub fn expect_bulk_strings(&self) -> util::Result<&RespDataType> {
+        match self {
+            RespDataType::BulkStrings(_) => Ok(self),
+            _ => Err("expected bulk strings".into()),
         }
     }
 }
@@ -221,7 +278,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_simple_strings() -> Result<()> {
-        assert_idempotent(RespDataType::SimpleStrings(Box::new("OK")), "+OK\r\n").await?;
+        assert_idempotent(RespDataType::simple_strings("OK"), "+OK\r\n").await?;
         Ok(())
     }
 

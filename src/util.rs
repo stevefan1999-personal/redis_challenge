@@ -1,6 +1,4 @@
-use std::error;
-use std::future::Future;
-use std::pin::Pin;
+use std::{error, future::Future, pin::Pin};
 
 pub fn strip_trailing_newline(input: &str) -> &str {
     input
